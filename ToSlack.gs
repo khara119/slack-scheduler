@@ -4,6 +4,9 @@ this.config = {};
  * 毎日1回実行され、その日の予定を通知する
  */
 function dayMain() {
+  // configデータを取得する
+  initConfigData();
+  
   // 以前のトリガーを削除する
   deleteDayTrigger();
   
@@ -85,7 +88,6 @@ function weekMain() {
   };
   
   postSlack(payload);
-  
 }
 
 /*
@@ -117,6 +119,21 @@ function getDayEvents(calendar_id, d) {
   }
   
   return contents;
+}
+
+/*
+ * Slackに投稿する
+ */
+function postSlack(payload) {
+  const options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload)
+  };
+  
+  Logger.log(options);
+  
+  UrlFetchApp.fetch(this.config.post_slack_url, options);
 }
 
 /*
@@ -212,6 +229,4 @@ function initConfigData() {
     
     this.config[key] = value;
   }
-  
-  Logger.log(this.config);
 }
