@@ -42,6 +42,9 @@ function dayMain() {
  * 週に一度実行され、翌週の予定を全て表示する
  */
 function weekMain() {
+  // configデータを設定する
+  initConfigData();
+  
   // 以前のトリガーを削除する
   deleteWeekTrigger();
   
@@ -138,15 +141,21 @@ function postSlack(payload) {
 
 /*
  * 毎日投稿する時間をセットする
- * （GASのトリガーは時間指定できないため、1時間前にセットしておき、この関数で詳細時間をセットする）
+ * （GASのトリガーは分単位で指定できないため、この関数で詳細時間をセットする）
  */
 function setDayTrigger() {
+  // configデータを設定する
+  initConfigData();
+  
   // 発火時間を設定する
   var triggerDate = new Date();
   triggerDate.setDate(triggerDate.getDate()+1);
   triggerDate.setHours(this.config.day_trigger_hour);
   triggerDate.setMinutes(this.config.day_trigger_minute);
-
+  
+  Logger.log(triggerDate);
+  Logger.log(this.config);
+  
   // 時間指定してトリガーをセットする
   ScriptApp.newTrigger("dayMain").timeBased().at(triggerDate).create();
 }
@@ -156,6 +165,9 @@ function setDayTrigger() {
  * (GASのトリガーは時間指定できないため、1時間前にセットしておき、この関数で詳細時間をセットする)
  */
 function setWeekTrigger() {
+  // configデータを設定する
+  initConfigData();
+  
   // 発火時間を設定する
   var triggerDate = new Date();
   triggerDate.setHours(this.config.week_trigger_hour);
