@@ -55,17 +55,18 @@ function weekMain() {
   var flag = false;
 
   // 次に調べる日を格納する変数
-  const next_date = new Date();
+  // (Moment.jsをライブラリに登録しておく必要あり)
+  const next_date = Moment.moment();
   for (var i=1; i<=7; i++) {
     // 1日ずらす
-    next_date.setDate(next_date.getDate()+i);
+    next_date.add(1, 'days');
 
     // 指定した日のイベントを取得する
     const tmp = getDayEvents(this.config.calendar_id, next_date);
 
     // イベントがあればそれを記載する
     if (tmp) {
-      contents += "> "+Utilities.formatDate(next_date, "GMT+0900", "MM/dd("+getDayJP(next_date.getDay())+")") + "\n";
+      contents += "> " + next_date.format("MM/DD") + "(" + getDayJP(next_date.day()) + ")\n";
       contents += "```\n";
       contents += tmp;
       contents += "```\n";
@@ -97,19 +98,19 @@ function weekMain() {
  * 指定された日（指定されなければ当日）のイベントを全て取得する
  */
 function getDayEvents(calendar_id, d) {
-  const date = d || new Date();
+  const date = d || Moment.moment();
 
   // イベントの内容を文字列化して返す変数
   var contents = "";
 
   // カレンダーの取得とイベントの取得
   const calendar = CalendarApp.getCalendarById(calendar_id);
-  const events = calendar.getEventsForDay(date);
+  const events = calendar.getEventsForDay(date,toDate());
   
   for (var i=0; i<events.length; i++) {
     // 終日イベント
     if (events[i].isAllDayEvent()) {
-      tmp = Utilities.formatDate(new Date(), "GMT+0900", "MM/dd ");
+      tmp = date.format("MM/DD") + " ";
       tmp += events[i].getTitle()+"\n";
       contents = tmp + contents;
     } else {
@@ -152,9 +153,6 @@ function setDayTrigger() {
   triggerDate.setDate(triggerDate.getDate()+1);
   triggerDate.setHours(this.config.day_trigger_hour);
   triggerDate.setMinutes(this.config.day_trigger_minute);
-  
-  Logger.log(triggerDate);
-  Logger.log(this.config);
   
   // 時間指定してトリガーをセットする
   ScriptApp.newTrigger("dayMain").timeBased().at(triggerDate).create();
