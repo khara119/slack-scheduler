@@ -105,7 +105,7 @@ function getDayEvents(calendar_id, d) {
 
   // カレンダーの取得とイベントの取得
   const calendar = CalendarApp.getCalendarById(calendar_id);
-  const events = calendar.getEventsForDay(date,toDate());
+  const events = calendar.getEventsForDay(date.toDate());
   
   for (var i=0; i<events.length; i++) {
     // 終日イベント
