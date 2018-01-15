@@ -62,7 +62,7 @@ function weekMain() {
     next_date.add(1, 'days');
 
     // 指定した日のイベントを取得する
-    const tmp = getDayEvents(this.config.calendar_id, next_date);
+    var tmp = getDayEvents(this.config.calendar_id, next_date);
 
     // イベントがあればそれを記載する
     if (tmp) {
@@ -82,7 +82,7 @@ function weekMain() {
     contents += "来週の予定は何もありません";
     contents += "```\n";
   }
-
+  
   // Slackに投稿する
   const payload = {
     "text": contents,
@@ -110,12 +110,12 @@ function getDayEvents(calendar_id, d) {
   for (var i=0; i<events.length; i++) {
     // 終日イベント
     if (events[i].isAllDayEvent()) {
-      tmp = date.format("MM/DD") + " ";
+      var tmp = date.format("MM/DD") + " ";
       tmp += events[i].getTitle()+"\n";
       contents = tmp + contents;
     } else {
       // 時間指定イベント
-      tmp = Utilities.formatDate(events[i].getStartTime(), "GMT+0900", "MM/dd HH:mm");
+      var tmp = Utilities.formatDate(events[i].getStartTime(), "GMT+0900", "MM/dd HH:mm");
       tmp += Utilities.formatDate(events[i].getEndTime(), "GMT+0900", "-HH:mm ");
       tmp += events[i].getTitle()+"\n";
       contents = contents + tmp;
