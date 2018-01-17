@@ -1,6 +1,8 @@
 this.config = {};
 
-/*
+/** 以下、定期通知の関数 **/
+
+/**
  * 毎日1回実行され、その日の予定を通知する
  */
 function dayMain() {
@@ -38,7 +40,7 @@ function dayMain() {
   postSlack(payload);
 }
 
-/*
+/**
  * 週に一度実行され、翌週の予定を全て表示する
  */
 function weekMain() {
@@ -94,7 +96,72 @@ function weekMain() {
   postSlack(payload);
 }
 
-/*
+/**
+ * 毎日投稿する時間をセットする
+ * （GASのトリガーは分単位で指定できないため、この関数で詳細時間をセットする）
+ */
+function setDayTrigger() {
+  // configデータを設定する
+  initConfigData();
+  
+  // 発火時間を設定する
+  var triggerDate = new Date();
+  triggerDate.setDate(triggerDate.getDate()+1);
+  triggerDate.setHours(this.config.day_trigger_hour);
+  triggerDate.setMinutes(this.config.day_trigger_minute);
+  
+  // 時間指定してトリガーをセットする
+  ScriptApp.newTrigger("dayMain").timeBased().at(triggerDate).create();
+}
+
+/**
+ * 週１で投稿する時間をセットする
+ * (GASのトリガーは時間指定できないため、1時間前にセットしておき、この関数で詳細時間をセットする)
+ */
+function setWeekTrigger() {
+  // configデータを設定する
+  initConfigData();
+  
+  // 発火時間を設定する
+  var triggerDate = new Date();
+  triggerDate.setHours(this.config.week_trigger_hour);
+  triggerDate.setMinutes(this.config.week_trigger_minute);
+
+  // 時間指定してトリガーをセットする
+  ScriptApp.newTrigger("weekMain").timeBased().at(triggerDate).create();
+}
+
+/**
+ * 設定した毎日のトリガーを削除する
+ */
+function deleteDayTrigger() {
+  // トリガーの取得
+  const triggers = ScriptApp.getProjectTriggers();
+  for (var i=0; i<triggers.length; i++) {
+    // 毎日投稿するトリガーであれば削除
+    if (triggers[i].getHandlerFunction() == "dayMain"){
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+}
+
+/**
+ * 設定した週1のトリガーを削除する
+ */
+function deleteWeekTrigger() {
+  // トリガーの取得
+  const triggers = ScriptApp.getProjectTriggers();
+  for (var i=0; i<triggers.length; i++) {
+    // 週1で投稿するトリガーなら削除
+    if (triggers[i].getHandlerFunction() == "weekMain"){
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+}
+
+/** 以下、Util系関数 **/
+
+/**
  * 指定された日（指定されなければ当日）のイベントを全て取得する
  */
 function getDayEvents(calendar_id, d) {
@@ -125,7 +192,7 @@ function getDayEvents(calendar_id, d) {
   return contents;
 }
 
-/*
+/**
  * Slackに投稿する
  */
 function postSlack(payload) {
@@ -140,70 +207,7 @@ function postSlack(payload) {
   UrlFetchApp.fetch(this.config.post_slack_url, options);
 }
 
-/*
- * 毎日投稿する時間をセットする
- * （GASのトリガーは分単位で指定できないため、この関数で詳細時間をセットする）
- */
-function setDayTrigger() {
-  // configデータを設定する
-  initConfigData();
-  
-  // 発火時間を設定する
-  var triggerDate = new Date();
-  triggerDate.setDate(triggerDate.getDate()+1);
-  triggerDate.setHours(this.config.day_trigger_hour);
-  triggerDate.setMinutes(this.config.day_trigger_minute);
-  
-  // 時間指定してトリガーをセットする
-  ScriptApp.newTrigger("dayMain").timeBased().at(triggerDate).create();
-}
-
-/*
- * 週１で投稿する時間をセットする
- * (GASのトリガーは時間指定できないため、1時間前にセットしておき、この関数で詳細時間をセットする)
- */
-function setWeekTrigger() {
-  // configデータを設定する
-  initConfigData();
-  
-  // 発火時間を設定する
-  var triggerDate = new Date();
-  triggerDate.setHours(this.config.week_trigger_hour);
-  triggerDate.setMinutes(this.config.week_trigger_minute);
-
-  // 時間指定してトリガーをセットする
-  ScriptApp.newTrigger("weekMain").timeBased().at(triggerDate).create();
-}
-
-/*
- * 設定した毎日のトリガーを削除する
- */
-function deleteDayTrigger() {
-  // トリガーの取得
-  const triggers = ScriptApp.getProjectTriggers();
-  for (var i=0; i<triggers.length; i++) {
-    // 毎日投稿するトリガーであれば削除
-    if (triggers[i].getHandlerFunction() == "dayMain"){
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
-}
-
-/*
- * 設定した週1のトリガーを削除する
- */
-function deleteWeekTrigger() {
-  // トリガーの取得
-  const triggers = ScriptApp.getProjectTriggers();
-  for (var i=0; i<triggers.length; i++) {
-    // 週1で投稿するトリガーなら削除
-    if (triggers[i].getHandlerFunction() == "weekMain"){
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
-}
-
-/*
+/**
  * 日本語名の曜日を取得する
  */
 function getDayJP(num) {
@@ -225,7 +229,7 @@ function getDayJP(num) {
   }
 }
 
-/*
+/**
  * スプレッドシートから設定データを取得する
  */
 function initConfigData() {
