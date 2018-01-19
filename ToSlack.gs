@@ -30,7 +30,7 @@ function dayMain() {
   contents += "```\n";
   
   // Slackに投稿する
-  const payload = {
+  var payload = {
     "text": contents,
     "channel": this.config.channel,
     "username": this.config.username,
@@ -58,7 +58,7 @@ function weekMain() {
 
   // 次に調べる日を格納する変数
   // (Moment.jsをライブラリに登録しておく必要あり)
-  const next_date = Moment.moment();
+  var next_date = Moment.moment();
   for (var i=1; i<=7; i++) {
     // 1日ずらす
     next_date.add(1, 'days');
@@ -86,7 +86,7 @@ function weekMain() {
   }
   
   // Slackに投稿する
-  const payload = {
+  var payload = {
     "text": contents,
     "channel": this.config.channel,
     "username": this.config.username,
@@ -136,7 +136,7 @@ function setWeekTrigger() {
  */
 function deleteDayTrigger() {
   // トリガーの取得
-  const triggers = ScriptApp.getProjectTriggers();
+  var triggers = ScriptApp.getProjectTriggers();
   for (var i=0; i<triggers.length; i++) {
     // 毎日投稿するトリガーであれば削除
     if (triggers[i].getHandlerFunction() == "dayMain"){
@@ -150,12 +150,157 @@ function deleteDayTrigger() {
  */
 function deleteWeekTrigger() {
   // トリガーの取得
-  const triggers = ScriptApp.getProjectTriggers();
+  var triggers = ScriptApp.getProjectTriggers();
   for (var i=0; i<triggers.length; i++) {
     // 週1で投稿するトリガーなら削除
     if (triggers[i].getHandlerFunction() == "weekMain"){
       ScriptApp.deleteTrigger(triggers[i]);
     }
+  }
+}
+
+/** 以下、検知型通知の関数 **/
+
+/**
+ * イベントの新規登録・削除を通知する
+ * SpreadSheetをデータベースとし、Calendarのイベントと比較することで差分を検知する
+ * トリガーにて1分毎に実行するように指定（トリガーの上限時間に引っかからないように注意する）
+ */
+function notifyEvents() {
+  // configデータを設定する
+  initConfigData();
+
+  // SpreadSheetに記録しているイベントを取得する
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("event");
+  var last_row = sheet.getLastRow();
+  
+  var saved_events = {};
+  for (var i=3; i<=last_row; i++) {
+    var id = sheet.getRange(i, 1).getValue();
+    var title = sheet.getRange(i, 2).getValue();
+    var start_time = Moment.moment(sheet.getRange(i, 3).getValue());
+    var end_time = Moment.moment(sheet.getRange(i, 4).getValue());
+    var is_allday = (sheet.getRange(i, 5).getValue() ? true : false);
+    
+    if (Moment.moment().isAfter(end_time)) {
+      sheet.deleteRow(i);
+      i--;
+      last_row--;
+      continue;
+    } 
+    
+    if (!saved_events[id]) {
+      saved_events[id] = {
+        title: title,
+        start_time: start_time,
+        end_time: end_time,
+        is_allday: is_allday,
+        is_deleted: true,
+        row: i,
+      }
+    } else {
+      Logger.log('重複したイベントが見つかりました。');
+      return;
+    }
+  }
+  
+  var start_date = Moment.moment();
+  var end_date = start_date.clone().add(1, 'years').endOf('day');
+  
+  var calendar = CalendarApp.getCalendarById(this.config.calendar_id);
+  var events = calendar.getEvents(start_date.toDate(), end_date.toDate());
+  
+  var contents = '';
+  for (var i=0; i<events.length; i++) {
+    var event_id = events[i].getId();
+    
+    // 保存されていないイベント（=新規イベント）があった場合の処理
+    if (!saved_events[event_id]) {
+      var st = Moment.moment(events[i].getStartTime()).format('YYYY-MM-DD HH:mm');
+      var et = Moment.moment(events[i].getEndTime()).format('YYYY-MM-DD HH:mm');
+
+      saved_events[event_id] = {
+        title: events[i].getTitle(),
+        start_time: st,
+        end_time: et,
+        is_allday: events[i].isAllDayEvent(),
+        is_deleted: false,
+      };
+
+      last_row++;
+      
+      // SpreadSheetに新規追加する
+      sheet.getRange(last_row, 1).setValue(event_id);
+      sheet.getRange(last_row, 2).setValue(events[i].getTitle()); 
+      sheet.getRange(last_row, 3).setValue(st); 
+      sheet.getRange(last_row, 4).setValue(et); 
+      
+      contents += '```\n';
+      // 終日イベントの場合
+      if (events[i].isAllDayEvent()) {
+        sheet.getRange(last_row, 5).setValue('◯');
+        contents += Moment.moment(events[i].getStartTime()).format('MM/DD');
+      } else {
+        // 時間指定イベントの場合
+        contents += Moment.moment(events[i].getStartTime()).format('MM/DD HH:mm') + '-' +
+          Moment.moment(events[i].getEndTime()).format('HH:mm');
+      }
+      
+      contents += ' ' + events[i].getTitle() + '\n';
+      contents += '```\n';
+    } else {
+      saved_events[event_id].is_deleted = false;
+    }
+  }
+  
+  // 削除されたイベントの通知
+  var removed_contents = '';
+  for (var id in saved_events) {
+    var event = saved_events[id];
+    
+    if (event.is_deleted) {
+      removed_contents += '```\n';
+      if (event.is_allday) {
+        removed_contents += Moment.moment(event.start_time).format('MM/DD');
+      } else {
+        removed_contents += Moment.moment(event.start_time).format('MM/DD HH:mm') + '-' +
+          Moment.moment(event.end_time).format('HH:mm');
+      }
+      removed_contents += ' ' + event.title + '\n';
+      removed_contents += '```\n';
+      
+      sheet.deleteRow(event.row);
+    }
+  }
+  
+  if (removed_contents) {
+    removed_contents = '予定がキャンセルされました。\n' + removed_contents;
+    
+    // Slackに投稿する
+    var payload = {
+      "text": removed_contents,
+      "channel": this.config.channel,
+      "username": this.config.username,
+      "icon_url": this.config.icon_url,
+    };
+    
+    postSlack(payload);
+  }    
+
+  // 新規イベントがあれば内容を整えてSlackに投稿する
+  if (contents) {
+    contents = '予定が追加されました。\n' + contents;
+    
+    // Slackに投稿する
+    var payload = {
+      "text": contents,
+      "channel": this.config.channel,
+      "username": this.config.username,
+      "icon_url": this.config.icon_url,
+    };
+    
+    postSlack(payload);
   }
 }
 
@@ -165,14 +310,14 @@ function deleteWeekTrigger() {
  * 指定された日（指定されなければ当日）のイベントを全て取得する
  */
 function getDayEvents(calendar_id, d) {
-  const date = d || Moment.moment();
+  var date = d || Moment.moment();
 
   // イベントの内容を文字列化して返す変数
   var contents = "";
 
   // カレンダーの取得とイベントの取得
-  const calendar = CalendarApp.getCalendarById(calendar_id);
-  const events = calendar.getEventsForDay(date.toDate());
+  var calendar = CalendarApp.getCalendarById(calendar_id);
+  var events = calendar.getEventsForDay(date.toDate());
   
   for (var i=0; i<events.length; i++) {
     // 終日イベント
@@ -196,7 +341,7 @@ function getDayEvents(calendar_id, d) {
  * Slackに投稿する
  */
 function postSlack(payload) {
-  const options = {
+  var options = {
     "method": "post",
     "contentType": "application/json",
     "payload": JSON.stringify(payload)
@@ -233,14 +378,20 @@ function getDayJP(num) {
  * スプレッドシートから設定データを取得する
  */
 function initConfigData() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("config");
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("config");
   
-  const last_row = sheet.getLastRow();
+  var last_row = sheet.getLastRow();
   for (var i=1; i<=last_row; i++) {
     key = sheet.getRange(i, 1).getValue();
     value = sheet.getRange(i, 2).getValue();
     
     this.config[key] = value;
   }
+}
+
+/**
+ * SpreadSheetにをログを出力する
+ */
+function log(type, str) {
 }
