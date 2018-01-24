@@ -197,6 +197,7 @@ function notifyEvents() {
         end_time: end_time,
         is_allday: is_allday,
         is_deleted: true,
+        is_changed: false,
         row: i,
       }
     } else {
@@ -226,6 +227,7 @@ function notifyEvents() {
         end_time: et,
         is_allday: events[i].isAllDayEvent(),
         is_deleted: false,
+        is_changed: false,
       };
 
       last_row++;
@@ -250,12 +252,35 @@ function notifyEvents() {
       contents += ' ' + events[i].getTitle() + '\n';
       contents += '```\n';
     } else {
-      saved_events[event_id].is_deleted = false;
+      // 保存されていれば削除フラグを消し、変更確認をする
+      var event = saved_events[event_id];
+      event.is_deleted = false;
+      
+      // 変更されている項目があれば変更フラグを立てる
+      if (event.title != events[i].getTitle() ||
+          !event.start_time.isSame(events[i].getStartTime()) ||
+          !event.end_time.isSame(events[i].getEndTime()) ||
+          event.is_allday != events[i].isAllDayEvent()) {
+            event.old_title = event.title;
+            event.old_start_time = event.start_time.clone();
+            event.old_end_time = event.end_time.clone();
+            event.old_is_allday = event.is_allday;
+            
+            event.title = events[i].getTitle();
+            event.start_time = Moment.moment(events[i].getStartTime());
+            event.end_time = Moment.moment(events[i].getEndTime());
+            event.is_allday = events[i].isAllDayEvent();
+            event.is_changed = true;
+      }
     }
   }
   
-  // 削除されたイベントの通知
+  // 削除されたイベントの通知内容
   var removed_contents = '';
+  // 変更されたイベントの通知内容
+  var changed_contents = '';
+  
+  // 削除・変更されたイベントの通知内容を整理
   for (var id in saved_events) {
     var event = saved_events[id];
     
@@ -272,10 +297,33 @@ function notifyEvents() {
       
       sheet.deleteRow(event.row);
     }
+    
+    if (event.is_changed) {
+      changed_contents += '```\n';
+      if (event.old_is_allday) {
+        changed_contents += Moment.moment(event.old_start_time).format('MM/DD');
+      } else {
+        changed_contents += Moment.moment(event.old_start_time).format('MM/DD HH:mm') + '-' +
+          Moment.moment(event.old_end_time).format('HH:mm');
+      }
+      changed_contents += ' ' + event.old_title + '\n';
+      changed_contents += '     ↓↓↓↓↓\n';
+      
+      if (event.is_allday) {
+        changed_contents += Moment.moment(event.start_time).format('MM/DD');
+      } else {
+        changed_contents += Moment.moment(event.start_time).format('MM/DD HH:mm') + '-' +
+          Moment.moment(event.end_time).format('HH:mm');
+      }
+      changed_contents += ' ' + event.title + '\n';
+      
+      changed_contents += '```\n';
+    }
   }
   
+  // 削除されたイベントを投稿
   if (removed_contents) {
-    removed_contents = '予定がキャンセルされました。\n' + removed_contents;
+    removed_contents = '下記予定がキャンセルされました。\n' + removed_contents;
     
     // Slackに投稿する
     var payload = {
@@ -286,11 +334,26 @@ function notifyEvents() {
     };
     
     postSlack(payload);
-  }    
-
+  }
+    
+  // 変更されたイベントを投稿
+  if (changed_contents) {
+    changed_contents = '下記予定が変更されました。\n' + changed_contents;
+    
+    // Slackに投稿する
+    var playload = {
+      "text": changed_contents,
+      "channel": this.config.channel,
+      "username": this.config.username,
+      "icon_url": this.config.icon_url,
+    };
+    
+    postSlack(payload);
+  }
+  
   // 新規イベントがあれば内容を整えてSlackに投稿する
   if (contents) {
-    contents = '予定が追加されました。\n' + contents;
+    contents = '下記予定が追加されました。\n' + contents;
     
     // Slackに投稿する
     var payload = {
