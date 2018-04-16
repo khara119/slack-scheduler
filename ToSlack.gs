@@ -242,10 +242,10 @@ function notifyEvents() {
       // 終日イベントの場合
       if (events[i].isAllDayEvent()) {
         sheet.getRange(last_row, 5).setValue('◯');
-        contents += Moment.moment(events[i].getStartTime()).format('MM/DD');
+        contents += Moment.moment(events[i].getStartTime()).format('MM/DD(ddd)');
       } else {
         // 時間指定イベントの場合
-        contents += Moment.moment(events[i].getStartTime()).format('MM/DD HH:mm') + '-' +
+        contents += Moment.moment(events[i].getStartTime()).format('MM/DD(ddd) HH:mm') + '-' +
           Moment.moment(events[i].getEndTime()).format('HH:mm');
       }
       
@@ -256,11 +256,23 @@ function notifyEvents() {
       var event = saved_events[event_id];
       event.is_deleted = false;
       
+      var calendar_event_data = {
+        title: events[i].getTitle(),
+        start_time: Moment.moment(events[i].getStartTime()).format('YYYY-MM-DD HH:mm'),
+        end_time: Moment.moment(events[i].getEndTime()).format('YYYY-MM-DD HH:mm'),
+        is_allday: events[i].isAllDayEvent() ? '◯' : '',
+        is_deleted: false,
+        is_changed: true,
+        row: event.row,
+      }
+      
+      console.log(JSON.stringify(event));
+      console.log(JSON.stringify(calendar_event_data));
+      console.log(JSON.stringify(event) != JSON.stringify(calendar_event_data));
+      
       // 変更されている項目があれば変更フラグを立てる
-      if (event.title != events[i].getTitle() ||
-          !event.start_time.isSame(events[i].getStartTime()) ||
-          !event.end_time.isSame(events[i].getEndTime()) ||
-          event.is_allday != events[i].isAllDayEvent()) {
+      if (event.id == events[i].getId() &&
+          JSON.stringify(event) != JSON.stringify(calendar_event_data)) {
             event.old_title = event.title;
             event.old_start_time = event.start_time.clone();
             event.old_end_time = event.end_time.clone();
@@ -287,9 +299,9 @@ function notifyEvents() {
     if (event.is_deleted) {
       removed_contents += '```\n';
       if (event.is_allday) {
-        removed_contents += Moment.moment(event.start_time).format('MM/DD');
+        removed_contents += Moment.moment(event.start_time).format('MM/DD(ddd)');
       } else {
-        removed_contents += Moment.moment(event.start_time).format('MM/DD HH:mm') + '-' +
+        removed_contents += Moment.moment(event.start_time).format('MM/DD(ddd) HH:mm') + '-' +
           Moment.moment(event.end_time).format('HH:mm');
       }
       removed_contents += ' ' + event.title + '\n';
@@ -301,23 +313,32 @@ function notifyEvents() {
     if (event.is_changed) {
       changed_contents += '```\n';
       if (event.old_is_allday) {
-        changed_contents += Moment.moment(event.old_start_time).format('MM/DD');
+        changed_contents += Moment.moment(event.old_start_time).format('MM/DD(ddd)');
       } else {
-        changed_contents += Moment.moment(event.old_start_time).format('MM/DD HH:mm') + '-' +
+        changed_contents += Moment.moment(event.old_start_time).format('MM/DD(ddd) HH:mm') + '-' +
           Moment.moment(event.old_end_time).format('HH:mm');
       }
       changed_contents += ' ' + event.old_title + '\n';
       changed_contents += '     ↓↓↓↓↓\n';
       
       if (event.is_allday) {
-        changed_contents += Moment.moment(event.start_time).format('MM/DD');
+        changed_contents += Moment.moment(event.start_time).format('MM/DD(ddd)');
       } else {
-        changed_contents += Moment.moment(event.start_time).format('MM/DD HH:mm') + '-' +
+        changed_contents += Moment.moment(event.start_time).format('MM/DD(ddd) HH:mm') + '-' +
           Moment.moment(event.end_time).format('HH:mm');
       }
       changed_contents += ' ' + event.title + '\n';
       
       changed_contents += '```\n';
+
+      // SpreadSheetに登録している内容を変更する
+      sheet.getRange(event.row, 1).setValue(event.id);
+      sheet.getRange(event.row, 2).setValue(event.title()); 
+      sheet.getRange(event.row, 3).setValue(event.start_time.format('YYYY-MM-DD HH:mm')); 
+      sheet.getRange(event.row, 4).setValue(event.end_time.format('YYYY-MM-DD HH:mm'));
+      if (event.is_allday) {
+        sheet.getRange(event.row, 5).setValue("◯");
+      }
     }
   }
   
