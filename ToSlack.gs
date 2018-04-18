@@ -344,7 +344,7 @@ function notifyEvents() {
   
   // 削除されたイベントを投稿
   if (removed_contents) {
-    removed_contents = '下記予定がキャンセルされました。\n' + removed_contents;
+    removed_contents = '予定がキャンセルされました。\n' + removed_contents;
     
     // Slackに投稿する
     var payload = {
@@ -359,7 +359,7 @@ function notifyEvents() {
     
   // 変更されたイベントを投稿
   if (changed_contents) {
-    changed_contents = '下記予定が変更されました。\n' + changed_contents;
+    changed_contents = '予定が変更されました。\n' + changed_contents;
     
     // Slackに投稿する
     var playload = {
@@ -374,7 +374,7 @@ function notifyEvents() {
   
   // 新規イベントがあれば内容を整えてSlackに投稿する
   if (contents) {
-    contents = '下記予定が追加されました。\n' + contents;
+    contents = '予定が追加されました。\n' + contents;
     
     // Slackに投稿する
     var payload = {
